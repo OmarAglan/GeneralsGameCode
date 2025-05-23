@@ -68,7 +68,7 @@ jobs:
           $fileHash = (Get-FileHash -Path VS6_VisualStudio6.7z -Algorithm SHA256).Hash
           Write-Host "Downloaded file SHA256: $fileHash"
           Write-Host "Expected file SHA256: $env:EXPECTED_HASH"
-          if ($hash -ne $env:EXPECTED_HASH) {
+          if ($fileHash -ne $env:EXPECTED_HASH) { # Corrected variable name from $hash to $fileHash
               Write-Error "Hash verification failed! File may be corrupted or tampered with."
               exit 1
           }
@@ -102,8 +102,34 @@ jobs:
         with:
           arch: x86
 
-      - name: Setup vcpkg
+      # --- VCPKG CACHING AND SETUP START ---
+      - name: Cache vcpkg artifacts (installed packages and downloads)
+        if: startsWith(inputs.preset, 'win32') # Only for presets that use vcpkg
+        uses: actions/cache@v4
+        id: vcpkg-cache-step # Optional: give it an ID if you want to check cache-hit status later
+        with:
+          path: |
+            ${{ github.workspace }}/vcpkg_installed
+            ${{ github.workspace }}/vcpkg/downloads
+          key: vcpkg-cache-${{ runner.os }}-${{ inputs.preset }}-${{ hashFiles('vcpkg.json', '.github/workflows/build-toolchain.yml') }}
+          restore-keys: |
+            vcpkg-cache-${{ runner.os }}-${{ inputs.preset }}-${{ hashFiles('vcpkg.json') }}-
+            vcpkg-cache-${{ runner.os }}-${{ inputs.preset }}-
+            vcpkg-cache-${{ runner.os }}-
+
+      - name: Setup vcpkg and install dependencies from vcpkg.json
+        if: startsWith(inputs.preset, 'win32') # Only for presets that use vcpkg
         uses: lukka/run-vcpkg@v11
+        with:
+          # vcpkgJsonGlob: 'vcpkg.json' # Default, explicitly finding vcpkg.json at root
+          # runVcpkgInstall: true # Default when vcpkg.json is found.
+          # It will use the restored cache if available, significantly speeding up this step.
+          # lukka/run-vcpkg also sets CMAKE_TOOLCHAIN_FILE environment variable.
+          # It handles bootstrapping vcpkg into ${{ github.workspace }}/vcpkg if not present.
+          # The cache step above handles caching the results (installed packages & downloads).
+          # vcpkgGitCommitId: 'your_preferred_vcpkg_commit_sha' # Optional: Pin vcpkg tool for more stability
+
+      # --- VCPKG CACHING AND SETUP END ---
 
       - name: Configure ${{ inputs.game }} with CMake Using ${{ inputs.preset }}${{ inputs.tools && '+t' || '' }}${{ inputs.extras && '+e' || '' }} Preset
         shell: pwsh
@@ -121,6 +147,8 @@ jobs:
 
           Write-Host "Build flags: $($buildFlags -join ' | ')"
 
+          # CMake should automatically pick up the vcpkg toolchain file set by lukka/run-vcpkg
+          # or your CMakePresets.json might configure it.
           cmake --preset ${{ inputs.preset }} $buildFlags
 
       - name: Build ${{ inputs.game }} with CMake Using ${{ inputs.preset }}${{ inputs.tools && '+t' || '' }}${{ inputs.extras && '+e' || '' }} Preset

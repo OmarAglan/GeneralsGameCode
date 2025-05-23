@@ -1,8 +1,11 @@
 name: GenCI
 
+# Updated permissions for GitHub Pages
 permissions:
   contents: read
   pull-requests: write
+  pages: write      # Needed for actions/deploy-pages
+  id-token: write   # Needed for actions/deploy-pages
 
 on:
   push:
@@ -34,7 +37,7 @@ jobs:
         uses: dorny/paths-filter@v3
         id: filter
         with:
-          token: ''
+          token: '' # Using GITHUB_TOKEN implicitly for local checkout, or '' if not needed for API calls
           filters: |
             generals:
               - 'Generals/**'
@@ -62,19 +65,20 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.generals == 'true' || needs.detect-changes.outputs.shared == 'true' }}
     strategy:
       matrix:
+        # Your existing matrix
         include:
-          - preset: "vc6"
-            tools: true
-            extras: true
-          - preset: "vc6-profile"
-            tools: true
-            extras: true
-          - preset: "vc6-internal"
-            tools: true
-            extras: true
-          - preset: "vc6-debug"
-            tools: true
-            extras: true
+        #  - preset: "vc6"
+        #    tools: true
+        #    extras: true
+        #  - preset: "vc6-profile"
+         #   tools: true
+           # extras: true
+       #   - preset: "vc6-internal"
+        #    tools: true
+         #   extras: true
+         # - preset: "vc6-debug"
+          #  tools: true
+          #  extras: true
           - preset: "win32-vcpkg"
             tools: true
             extras: true
@@ -102,20 +106,21 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.generalsmd == 'true' || needs.detect-changes.outputs.shared == 'true' }}
     strategy:
       matrix:
+        # Your existing matrix
         include:
-          - preset: "vc6"
-            tools: true
-            extras: true
-          - preset: "vc6-profile"
-            tools: true
-            extras: true
-          - preset: "vc6-internal"
-            tools: true
-            extras: true
-          - preset: "vc6-debug"
-            tools: true
-            extras: true
-          - preset: "win32"
+       #   - preset: "vc6"
+       #     tools: true
+        #    extras: true
+    #      - preset: "vc6-profile"
+       #     tools: true
+        #    extras: true
+       #   - preset: "vc6-internal"
+        #    tools: true
+        #    extras: true
+       #   - preset: "vc6-debug"
+         #   tools: true
+         #   extras: true
+          - preset: "win32" # Assuming this maps to win32-vcpkg or similar based on your original
             tools: true
             extras: true
           - preset: "win32-profile"
@@ -135,3 +140,107 @@ jobs:
       tools: ${{ matrix.tools }}
       extras: ${{ matrix.extras }}
     secrets: inherit
+
+  # New job to prepare content for GitHub Pages
+  prepare-gh-pages:
+    name: Prepare GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-generals, build-generalsmd]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./all-build-artifacts/
+
+      - name: List downloaded artifacts (for debugging)
+        run: |
+          echo "Downloaded artifacts structure:"
+          ls -R ./all-build-artifacts/
+
+      - name: Create Pages content directory
+        run: mkdir ./_site
+
+      - name: Generate index.html and package artifacts as ZIPs
+        shell: bash
+        run: |
+          SITE_DIR="./_site"
+          INDEX_HTML="$SITE_DIR/index.html"
+          DOWNLOADS_DEST_DIR="$SITE_DIR/downloads" # Store final ZIP files here
+
+          mkdir -p "$DOWNLOADS_DEST_DIR"
+
+          echo "<!DOCTYPE html>" > "$INDEX_HTML"
+          echo "<html lang='en'>" >> "$INDEX_HTML"
+          echo "<head><meta charset='UTF-8'><title>Build Artifacts</title></head>" >> "$INDEX_HTML"
+          echo "<body>" >> "$INDEX_HTML"
+          echo "<h1>Build Artifacts</h1>" >> "$INDEX_HTML"
+          echo "<p>Commit: <a href='${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}'>${{ github.sha }}</a></p>" >> "$INDEX_HTML"
+          echo "<p>Workflow Run: <a href='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'>#${{ github.run_number }}</a></p>" >> "$INDEX_HTML"
+          echo "<p>Last updated: $(TZ=UTC date -u +"%Y-%m-%d %H:%M:%S %Z")</p>" >> "$INDEX_HTML"
+          echo "<ul>" >> "$INDEX_HTML"
+          
+          shopt -s nullglob # Ensures loop doesn't run if no matches
+          artifact_count=0
+          # Each artifact was downloaded into a subdirectory named after the artifact
+          # e.g., ./all-build-artifacts/Generals-vc6+t+e/ will contain the files of that artifact.
+          for artifact_bundle_src_dir in ./all-build-artifacts/*; do
+            if [ -d "$artifact_bundle_src_dir" ]; then
+              artifact_bundle_name=$(basename "$artifact_bundle_src_dir")
+              echo "Processing artifact bundle: $artifact_bundle_name"
+              
+              zip_file_name="$artifact_bundle_name.zip"
+              zip_file_full_path_dest="$DOWNLOADS_DEST_DIR/$zip_file_name"
+              
+              echo "  Creating ZIP: $zip_file_full_path_dest from contents of $artifact_bundle_src_dir"
+              # (cd into the source directory to zip its contents without the parent path, then output the zip to $OLDPWD/$zip_file_full_path_dest)
+              # -j junks paths (stores files at top level of zip)
+              # -r recurses (in case there are subdirs within an artifact, though unlikely with current setup)
+              if (cd "$artifact_bundle_src_dir" && zip -r -j "$OLDPWD/$zip_file_full_path_dest" ./*); then
+                link_path_for_html="downloads/$zip_file_name" # Relative path for the href in index.html
+                echo "  <li><a href=\"$link_path_for_html\">$zip_file_name</a></li>" >> "$INDEX_HTML"
+                artifact_count=$((artifact_count + 1))
+              else
+                echo "  ERROR: Failed to create ZIP for $artifact_bundle_name" >> "$INDEX_HTML"
+                echo "  <li>Failed to package: $artifact_bundle_name (check logs)</li>" >> "$INDEX_HTML"
+              fi
+            fi
+          done
+          shopt -u nullglob
+
+          if [ "$artifact_count" -eq 0 ]; then
+             echo "  <li>No build artifacts were successfully packaged for this run.</li>" >> "$INDEX_HTML"
+          fi
+
+          echo "</ul>" >> "$INDEX_HTML"
+          echo "</body></html>" >> "$INDEX_HTML"
+
+          echo "Generated index.html content:"
+          cat "$INDEX_HTML"
+          echo "Site structure in $SITE_DIR (should contain index.html and a downloads/ directory with zips):"
+          ls -R "$SITE_DIR"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site # Upload the directory we just prepared (containing index.html and downloads/*.zip)
+
+  # New job to deploy to GitHub Pages
+  deploy-gh-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: prepare-gh-pages # Runs only if prepare-gh-pages completes successfully
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: ${{ github.repository }}-pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -178,7 +178,7 @@ set(WW3D2_SRC
     shader.h
     #shattersystem.cpp
     #shattersystem.h
-    shdlib.h
+    #shdlib.h
     #snappts.cpp
     #snapPts.h
     sortingrenderer.cpp
@@ -225,8 +225,8 @@ set(WW3D2_SRC
     #w3derr.h
     #w3dexclusionlist.cpp
     #w3dexclusionlist.h
-    ww3d.cpp
-    ww3d.h
+    #ww3d.cpp
+    #ww3d.h
     #ww3dformat.cpp
     #ww3dformat.h
     #ww3dids.h

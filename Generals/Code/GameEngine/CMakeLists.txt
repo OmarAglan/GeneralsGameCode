@@ -483,13 +483,13 @@ set(GAMEENGINE_SRC
 #    Include/GameNetwork/GameSpy/PingThread.h
 #    Include/GameNetwork/GameSpy/StagingRoomGameInfo.h
 #    Include/GameNetwork/GameSpy/ThreadUtils.h
-    Include/GameNetwork/GameSpyChat.h
-    Include/GameNetwork/GameSpyGameInfo.h
-    Include/GameNetwork/GameSpyGP.h
+#    Include/GameNetwork/GameSpyChat.h
+#    Include/GameNetwork/GameSpyGameInfo.h
+#    Include/GameNetwork/GameSpyGP.h
 #    Include/GameNetwork/GameSpyOverlay.h
     Include/GameNetwork/GameSpyPersistentStorage.h
 #    Include/GameNetwork/GameSpyThread.h
-    Include/GameNetwork/GUIUtil.h
+#    Include/GameNetwork/GUIUtil.h
 #    Include/GameNetwork/IPEnumeration.h
 #    Include/GameNetwork/LANAPI.h
 #    Include/GameNetwork/LANAPICallbacks.h
@@ -1034,7 +1034,7 @@ set(GAMEENGINE_SRC
 #    Source/GameNetwork/GameSpy/Thread/PingThread.cpp
 #    Source/GameNetwork/GameSpy/Thread/ThreadUtils.cpp
 #    Source/GameNetwork/GameSpyOverlay.cpp
-    Source/GameNetwork/GUIUtil.cpp
+#    Source/GameNetwork/GUIUtil.cpp
 #    Source/GameNetwork/IPEnumeration.cpp
 #    Source/GameNetwork/LANAPI.cpp
 #    Source/GameNetwork/LANAPICallbacks.cpp

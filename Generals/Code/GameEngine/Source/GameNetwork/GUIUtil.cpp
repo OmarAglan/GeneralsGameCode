@@ -1,5 +1,5 @@
 /*
-**	Command & Conquer Generals(tm)
+**	Command & Conquer Generals Zero Hour(tm)
 **	Copyright 2025 Electronic Arts Inc.
 **
 **	This program is free software: you can redistribute it and/or modify
@@ -40,9 +40,11 @@
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GameText.h"
+#include "GameLogic/GameLogic.h" // SUPERWEAPON_RESTRICT_COUNT
 #include "GameNetwork/GameInfo.h"
 #include "Common/PlayerTemplate.h"
 #include "GameNetwork/LANAPICallbacks.h" // for acceptTrueColor, etc
+#include "GameClient/ChallengeGenerals.h"
 
 
 // -----------------------------------------------------------------------------
@@ -251,6 +253,19 @@ void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], Game
 		if (fac->getStartingBuilding().isEmpty())
 			continue;
 
+		if ( myGame->oldFactionsOnly() && !fac->isOldFaction() )
+		  continue;
+
+		// Prevent players from selecting the disabled Generals for use.
+		// This is also enforced at game loading (GameLogic.cpp and UserPreferences.cpp).
+		// @todo: unlock these when something rad happens
+		Bool disallowLockedGenerals = TRUE;
+		const GeneralPersona *general = TheChallengeGenerals->getGeneralByTemplateName(fac->getName());
+		Bool startsLocked = general ? !general->isStartingEnabled() : FALSE;
+		if (disallowLockedGenerals && startsLocked)
+			continue;
+
+
 		AsciiString side;
 		side.format("SIDE:%s", fac->getSide().str());
 		if (seenSides.find(side) != seenSides.end())
@@ -302,6 +317,45 @@ void PopulateTeamComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGa
 		GadgetComboBoxSetItemData(comboArray[comboBox], newIndex, (void *)c);
 	}
 	GadgetComboBoxSetSelectedPos(comboArray[comboBox], 0);
+}
+
+// -----------------------------------------------------------------------------
+static UnicodeString formatMoneyForStartingCashComboBox( const Money & moneyAmount )
+{
+  UnicodeString rtn;
+  rtn.format( TheGameText->fetch( "GUI:StartingMoneyFormat" ), moneyAmount.countMoney() );
+  return rtn;
+}
+
+void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)
+{
+  GadgetComboBoxReset(comboBox);
+
+  const MultiplayerStartingMoneyList & startingCashMap = TheMultiplayerSettings->getStartingMoneyList();
+  Int currentSelectionIndex = -1;
+
+  MultiplayerStartingMoneyList::const_iterator it = startingCashMap.begin();
+  for ( ; it != startingCashMap.end(); it++ )
+  {
+    Int newIndex = GadgetComboBoxAddEntry(comboBox, formatMoneyForStartingCashComboBox( *it ),
+                                          comboBox->winGetEnabled() ? comboBox->winGetEnabledTextColor() : comboBox->winGetDisabledTextColor());
+    GadgetComboBoxSetItemData(comboBox, newIndex, (void *)it->countMoney());
+
+    if ( myGame->getStartingCash().amountEqual( *it ) )
+    {
+      currentSelectionIndex = newIndex;
+    }
+  }
+
+  if ( currentSelectionIndex == -1 )
+  {
+    DEBUG_CRASH( ("Current selection for starting cash not found in list") );
+    currentSelectionIndex = GadgetComboBoxAddEntry(comboBox, formatMoneyForStartingCashComboBox( myGame->getStartingCash() ),
+                                          comboBox->winGetEnabled() ? comboBox->winGetEnabledTextColor() : comboBox->winGetDisabledTextColor());
+    GadgetComboBoxSetItemData(comboBox, currentSelectionIndex, (void *)it->countMoney() );
+  }
+
+  GadgetComboBoxSetSelectedPos(comboBox, currentSelectionIndex);
 }
 
 // -----------------------------------------------------------------------------

@@ -1634,7 +1634,7 @@ void ScriptDialog::OnLoad()
 
 
 	} catch(...) {
-   	  	DEBUG_CRASH(("threw exception in ScriptDialog::OnLoad"));
+		DEBUG_CRASH(("threw exception in ScriptDialog::OnLoad"));
 	}
 }
 

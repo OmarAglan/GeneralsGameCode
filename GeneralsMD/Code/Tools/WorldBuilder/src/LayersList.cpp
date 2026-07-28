@@ -804,8 +804,22 @@ void LayersList::OnEndEditLabel(NMHDR *pNotifyStruct, LRESULT* pResult)
 		return;
 	}
 
-	layerIt->layerName = AsciiString(ptvdi->item.pszText);
-	if (mCurrentlyEditingLabel.compareNoCase(AsciiString(TheDefaultLayerName.c_str())) == 0) {
+	AsciiString newLayerName(ptvdi->item.pszText);
+	Bool isDefaultLayer = mCurrentlyEditingLabel.compareNoCase(AsciiString(TheDefaultLayerName.c_str())) == 0;
+	AsciiString objectLayerName = isDefaultLayer ? AsciiString::TheEmptyString : newLayerName;
+
+	// Keep persisted object and trigger assignments in sync with the renamed layer.
+	for (ListMapObjectPtrIt objectIt = layerIt->objectsInLayer.begin();
+		objectIt != layerIt->objectsInLayer.end(); ++objectIt) {
+		(*objectIt)->getProperties()->setAsciiString(TheKey_objectLayer, objectLayerName);
+	}
+	for (ListPolygonTriggerPtrIt triggerIt = layerIt->polygonTriggersInLayer.begin();
+		triggerIt != layerIt->polygonTriggersInLayer.end(); ++triggerIt) {
+		(*triggerIt)->setLayerName(newLayerName);
+	}
+
+	layerIt->layerName = newLayerName;
+	if (isDefaultLayer) {
 		// update the default label to be the new layer name.
 		TheDefaultLayerName = layerIt->layerName.str();
 	}

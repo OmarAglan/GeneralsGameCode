@@ -867,7 +867,7 @@ BEGIN
                     ES_AUTOHSCROLL | ES_NUMBER
     LTEXT           "Stopping Distance:",IDC_STATIC,82,188,83,8
     CONTROL         "Selectable",IDC_MAPOBJECT_Selectable,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,71,93,58,10
+                    BS_AUTO3STATE | WS_TABSTOP,71,93,58,10
     LTEXT           "Weather:",IDC_STATIC,3,155,66,8
     LTEXT           "Time:",IDC_STATIC,3,171,66,8
     LISTBOX         IDC_MAPOBJECT_BuildWithUpgrades,9,253,182,51,

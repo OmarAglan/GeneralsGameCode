@@ -669,10 +669,15 @@ void MapObjectProps::_DictToRecruitableAI()
 
 void MapObjectProps::_DictToSelectable()
 {
-	Bool selectable = true;
-	Bool exists;
+	// TheSuperHackers @bugfix Show a missing selectable key as indeterminate, like Zero Hour does.
+	// The game then keeps the object's default, so unchecked would be wrong.
+	Int selectable = BST_INDETERMINATE;
+	Bool exists = false;
 	if (m_dictToEdit) {
-		selectable  = m_dictToEdit->getBool(TheKey_objectSelectable, &exists);
+		Bool value = m_dictToEdit->getBool(TheKey_objectSelectable, &exists);
+		if (exists) {
+			selectable = value ? BST_CHECKED : BST_UNCHECKED;
+		}
 	}
 
 	CButton* pItem = (CButton*) GetDlgItem(IDC_MAPOBJECT_Selectable);
@@ -1191,12 +1196,15 @@ void MapObjectProps::_SelectableToDict()
 	getAllSelectedDicts();
 
 	CButton *owner = (CButton*) GetDlgItem(IDC_MAPOBJECT_Selectable);
-	Bool isChecked = (owner->GetCheck() != 0);
+	Int check = owner->GetCheck();
 
 	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	Dict newDict;
-	newDict.setBool(TheKey_objectSelectable, isChecked);
-	DictItemUndoable *pUndo = new DictItemUndoable(getAllSelectedDictsData(), newDict, newDict.getNthKey(0), m_allSelectedDicts.size());
+	// Indeterminate removes the key. Pass the key explicitly: an empty dict has no key and would replace the whole dict.
+	if (check != BST_INDETERMINATE) {
+		newDict.setBool(TheKey_objectSelectable, check == BST_CHECKED);
+	}
+	DictItemUndoable *pUndo = new DictItemUndoable(getAllSelectedDictsData(), newDict, TheKey_objectSelectable, m_allSelectedDicts.size());
 	pDoc->AddAndDoUndoable(pUndo);
 	REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
 	// Update is called by Do

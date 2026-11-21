@@ -217,7 +217,9 @@ jobs:
       - name: Reset ccache Statistics
         if: steps.ccache.outcome == 'success'
         shell: pwsh
-        run: ccache --zero-stats
+        run: |
+          ccache --zero-stats
+          "CCACHE_BUILD_START=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" >> $env:GITHUB_ENV
 
       - name: Build ${{ inputs.game }} with CMake Using ${{ inputs.preset }}${{ inputs.tools && '+t' || '' }}${{ inputs.extras && '+e' || '' }} Preset
         shell: pwsh
@@ -228,6 +230,15 @@ jobs:
         if: ${{ always() && steps.ccache.outcome == 'success' }}
         shell: pwsh
         run: ccache --show-stats --verbose
+
+      # Entries from older commits fill the size limit, and ccache then evicts entries the next build needs.
+      - name: Remove ccache Entries Not Used by This Build
+        if: ${{ steps.ccache.outcome == 'success' && github.event_name != 'pull_request' && steps.ccache-restore.outputs.cache-hit != 'true' }}
+        shell: pwsh
+        run: |
+          $age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [long]$env:CCACHE_BUILD_START + 60
+          ccache --evict-older-than "${age}s"
+          ccache --show-stats
 
       # Pull requests only restore, so caches change only after changes reach main.
       - name: Save MSVC Compilation Cache
